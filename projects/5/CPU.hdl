@@ -32,5 +32,46 @@ CHIP CPU {
         pc[15];          // address of next instruction
 
     PARTS:
-	//// Replace this comment with your code.
+	Not(in=instruction[15], out=instA);
+    Not(in=instA, out=instC);
+
+    // Destination bits
+    And(a=instruction[15], b=instruction[4], out=loadD);
+    And(a=instC, b=instruction[5], out=destA);
+    Or(a=instA, b=destA, out=loadA);
+
+    // ALU input mux
+    And(a=instC, b=instruction[12], out=AMtoALU);
+    Mux16(a=outA, b=inM, sel=AMtoALU, out=outAM);
+
+    // ALU operation
+    ALU(x=outD, y=outAM,
+        zx=instruction[11], nx=instruction[10],
+        zy=instruction[9],  ny=instruction[8],
+        f=instruction[7],   no=instruction[6],
+        out=outM, out=outALU, zr=zr, ng=ng);
+
+    // A and D registers
+    Mux16(a=outALU, b=instruction, sel=instA, out=inA);
+    ARegister(in=inA, load=loadA, out=outA, out[0..14]=addressM);
+    DRegister(in=outALU, load=loadD, out=outD);
+
+    // PC control logic
+    Or(a=zr, b=ng, out=state1);
+    Not(in=state1, out=pos);
+
+    And(a=instruction[0], b=pos, out=JGT);
+    And(a=instruction[1], b=zr,  out=JEQ);
+    And(a=instruction[2], b=ng,  out=JLT);
+
+    Or(a=JGT, b=JEQ, out=J1);
+    Or(a=JLT, b=J1, out=J2);
+    And(a=instC, b=J2, out=loadPC);
+
+    // Write M control
+    And(a=instC, b=instruction[3], out=loadM);
+    And(a=instC, b=instruction[3], out=writeM);
+
+    // PC
+    PC(in=outA, load=loadPC, inc=true, reset=reset, out[0..14]=pc);
 }
